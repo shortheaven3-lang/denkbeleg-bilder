@@ -1,0 +1,54 @@
+name: Slides rendern
+
+on:
+  push:
+    paths:
+      - 'posts/**'
+      - 'template/**'
+      - 'scripts/**'
+      - '.github/workflows/render.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  rendern:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Playwright installieren
+        run: |
+          pip install --quiet playwright
+          playwright install --with-deps chromium
+
+      - name: Schriften laden
+        run: |
+          mkdir -p fonts
+          curl -sSL -o fonts/Archivo.ttf "https://raw.githubusercontent.com/google/fonts/main/ofl/archivo/Archivo%5Bwdth,wght%5D.ttf"
+          curl -sSL -o fonts/Inter.ttf "https://raw.githubusercontent.com/google/fonts/main/ofl/inter/Inter%5Bopsz,wght%5D.ttf"
+          curl -sSL -o fonts/JetBrainsMono.ttf "https://raw.githubusercontent.com/google/fonts/main/ofl/jetbrainsmono/JetBrainsMono%5Bwght%5D.ttf"
+          ls -l fonts
+
+      - name: Rendern
+        run: |
+          for f in posts/*.json; do
+            echo "--- $f"
+            python3 scripts/render.py "$f"
+          done
+
+      - name: PNG verwerfen, nur JPEG behalten
+        run: find out -name '*.png' -delete
+
+      - name: Ergebnis committen
+        run: |
+          git config user.name 'denkbeleg-bot'
+          git config user.email 'bot@users.noreply.github.com'
+          git add out
+          git diff --staged --quiet || git commit -m 'Slides gerendert'
+          git push
